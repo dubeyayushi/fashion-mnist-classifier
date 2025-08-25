@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fashion MNIST Classifier</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <a href="https://github.com/dubeyayushi/fashion-mnist-classifier" class="github-link" target="_blank" rel="noopener" aria-label="View on GitHub">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="vertical-align:middle"><circle cx="16" cy="16" r="16" fill="#181717"/><path d="M16 7C11.03 7 7 11.03 7 16C7 20.08 9.87 23.44 13.84 24.5C14.34 24.59 14.5 24.29 14.5 24.04C14.5 23.82 14.49 23.22 14.49 22.5C12 22.91 11.48 21.59 11.48 21.59C11.04 20.5 10.42 20.22 10.42 20.22C9.55 19.63 10.49 19.64 10.49 19.64C11.46 19.71 11.95 20.64 11.95 20.64C12.81 22.13 14.19 21.7 14.74 21.47C14.83 20.85 15.08 20.43 15.36 20.19C13.37 19.95 11.25 19.18 11.25 15.98C11.25 15.03 11.6 14.26 12.18 13.66C12.09 13.42 11.78 12.5 12.27 11.32C12.27 11.32 13 11.07 14.5 12.09C15.19 11.9 15.94 11.81 16.69 11.81C17.44 11.81 18.19 11.9 18.88 12.09C20.38 11.07 21.11 11.32 21.11 11.32C21.6 12.5 21.29 13.42 21.2 13.66C21.78 14.26 22.13 15.03 22.13 15.98C22.13 19.19 20 19.95 18.01 20.19C18.37 20.5 18.69 21.1 18.69 22.01C18.69 23.25 18.68 23.77 18.68 24.04C18.68 24.29 18.84 24.6 19.34 24.5C23.31 23.44 26.18 20.08 26.18 16C26.18 11.03 22.15 7 16 7Z" fill="#fff"/></svg>
+  </a>
+  <button id="sidebarToggle" class="sidebar-toggle" aria-label="Open sidebar">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="6" y="9" width="20" height="2.5" rx="1.25" fill="#fff"/><rect x="6" y="15" width="20" height="2.5" rx="1.25" fill="#fff"/><rect x="6" y="21" width="20" height="2.5" rx="1.25" fill="#fff"/></svg>
+  </button>
+  <div class="sidebar slide-sidebar" id="sidebarPanel">
+    <button id="sidebarClose" class="sidebar-close" aria-label="Close sidebar">&times;</button>
+    <h2>About This Project</h2>
+    <p>
+      <b>Fashion MNIST Classifier</b> is a deep learning web app that classifies clothing images into 10 categories using a Convolutional Neural Network (CNN).<br><br>
+      <b>Key Steps:</b>
+      <ul>
+        <li>Explored and visualized the Fashion MNIST dataset (60,000 train, 10,000 test images).</li>
+        <li>Trained and compared multiple models: Logistic Regression, SVM, Random Forest, kNN, and CNN.</li>
+        <li>Evaluated models using accuracy, precision, and AUC metrics.</li>
+        <li>Selected CNN as the best model for deployment.</li>
+        <li>Tested the model on custom fashion images for real-world validation.</li>
+      </ul>
+    </p>
+  </div>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="container">
+    <header>
+      <h1>👗 Fashion MNIST Classifier</h1>
+      <p>Upload a clothing image and let AI predict its category.</p>
+    </header>
+
+    <main>
+      <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
+        <div class="upload-box" id="uploadBox">
+          <input type="file" name="file" id="fileInput" accept="image/*" required>
+          <label for="fileInput" id="fileLabel">
+            <span id="fileIcon" style="margin-right: 0.5em;">📷</span>
+            <span id="fileLabelText">Choose an image</span>
+          </label>
+        </div>
+        <button type="submit" class="btn" id="predictBtn">Predict</button>
+      </form>
+
+      <div id="result" class="result hidden">
+        <h2>Prediction Result</h2>
+        <p id="predictionText"></p>
+        <canvas id="probChart"></canvas>
+        <button id="tryAgainBtn" class="btn" style="margin-top:2rem;">Try Another Image</button>
+      </div>
+    </main>
+
+    <footer>
+      <p>Built with ❤️ using Flask + TensorFlow</p>
+    </footer>
+  </div>
+
+  <!-- Chart.js for probability visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const form = document.getElementById('uploadForm');
+    const resultDiv = document.getElementById('result');
+    const predictionText = document.getElementById('predictionText');
+    const probChartCanvas = document.getElementById('probChart');
+    const fileInput = document.getElementById('fileInput');
+    const fileLabel = document.getElementById('fileLabel');
+    const fileLabelText = document.getElementById('fileLabelText');
+    const fileIcon = document.getElementById('fileIcon');
+
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files && fileInput.files.length > 0) {
+        fileLabelText.textContent = 'Image Selected';
+        fileIcon.textContent = '✅';
+        fileLabel.classList.add('selected');
+      } else {
+        fileLabelText.textContent = 'Choose an image';
+        fileIcon.textContent = '📷';
+        fileLabel.classList.remove('selected');
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      // Hide upload and predict button after submit
+      document.getElementById('uploadBox').style.display = 'none';
+      document.getElementById('predictBtn').style.display = 'none';
+
+      const res = await fetch('/predict', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      predictionText.textContent = "Predicted Label: " + data.prediction;
+      resultDiv.classList.remove('hidden');
+
+      const labels = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot'];
+      const probs = data.probabilities[0];
+
+      new Chart(probChartCanvas, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Prediction Probability',
+            data: probs,
+            backgroundColor: [
+              'rgba(67,233,123,0.85)', // T-shirt/top
+              'rgba(54,162,235,0.85)', // Trouser
+              'rgba(255,206,86,0.85)', // Pullover
+              'rgba(255,99,132,0.85)', // Dress
+              'rgba(153,102,255,0.85)', // Coat
+              'rgba(38,249,215,0.85)', // Sandal
+              'rgba(255,159,64,0.85)', // Shirt
+              'rgba(106,17,203,0.85)', // Sneaker
+              'rgba(0,72,146,0.85)',   // Bag
+              'rgba(255,255,255,0.85)' // Ankle boot
+            ],
+            borderRadius: 10,
+            borderSkipped: false,
+            borderWidth: 0,
+            barPercentage: 0.7,
+            categoryPercentage: 0.6,
+            hoverBackgroundColor: 'rgba(67,233,123,1)'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#222',
+              titleColor: '#43e97b',
+              bodyColor: '#fff',
+              borderColor: '#43e97b',
+              borderWidth: 1,
+              padding: 12,
+              caretSize: 8,
+              cornerRadius: 8
+            },
+            title: {
+              display: false
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                color: '#e0e0e0',
+                font: { weight: 600 }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(255,255,255,0.08)',
+                borderDash: [4, 4]
+              },
+              ticks: {
+                color: '#e0e0e0',
+                font: { weight: 500 },
+                stepSize: 0.1
+              }
+            }
+          },
+          animation: {
+            duration: 900,
+            easing: 'easeOutQuart'
+          }
+        }
+      });
+      // Save chart instance for later destroy
+      probChartCanvas.chart = Chart.getChart(probChartCanvas);
+    });
+
+    // Try Again button logic
+    const tryAgainBtn = document.getElementById('tryAgainBtn');
+    tryAgainBtn.addEventListener('click', function() {
+      // Reset form and UI
+      form.reset();
+      resultDiv.classList.add('hidden');
+      fileLabelText.textContent = 'Choose an image';
+      fileIcon.textContent = '📷';
+      fileLabel.classList.remove('selected');
+      // Remove chart instance if present
+      if (probChartCanvas.chart) {
+        probChartCanvas.chart.destroy();
+        probChartCanvas.chart = null;
+      }
+      // Show upload and predict button again
+      document.getElementById('uploadBox').style.display = '';
+      document.getElementById('predictBtn').style.display = '';
+    });
+
+    // Sidebar open/close logic
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarPanel = document.getElementById('sidebarPanel');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    function openSidebar() {
+      sidebarPanel.classList.add('open');
+      sidebarOverlay.classList.add('show');
+    }
+    function closeSidebar() {
+      sidebarPanel.classList.remove('open');
+      sidebarOverlay.classList.remove('show');
+    }
+    sidebarToggle.addEventListener('click', openSidebar);
+    sidebarClose.addEventListener('click', closeSidebar);
+    sidebarOverlay.addEventListener('click', closeSidebar);
+  </script>
+</body>
+</html>
