@@ -18,19 +18,22 @@ def home():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    file = request.files["file"]
-    img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
-    img_resized = cv2.resize(img, (28, 28))
-    img_norm = img_resized.astype("float32") / 255.0
-    img_input = img_norm.reshape(1, 28, 28, 1)
+    try:
+        file = request.files["file"]
+        img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
+        img_resized = cv2.resize(img, (28, 28))
+        img_norm = img_resized.astype("float32") / 255.0
+        img_input = img_norm.reshape(1, 28, 28, 1)
 
-    preds = cnn_model.predict(img_input)
-    pred_label = np.argmax(preds, axis=1)[0]
+        preds = cnn_model.predict(img_input)
+        pred_label = np.argmax(preds, axis=1)[0]
 
-    return jsonify({
-        "prediction": class_names[pred_label],
-        "probabilities": preds.tolist()
-    })
+        return jsonify({
+            "prediction": class_names[pred_label],
+            "probabilities": preds.tolist()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
