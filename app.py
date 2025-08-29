@@ -1,12 +1,13 @@
 from flask import Flask, request, jsonify, render_template
 import numpy as np
-import cv2
 from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+from io import BytesIO
 
 app = Flask(__name__)
 
 # Load trained CNN model
-cnn_model = load_model("cnn_fashion_model.h5")
+cnn_model = load_model("cnn_fashion_model.keras")
 
 # Fashion-MNIST class names
 class_names = ['T-shirt/top','Trouser','Pullover','Dress','Coat',
@@ -26,12 +27,10 @@ def predict():
         print("Received /predict request")
         file = request.files["file"]
         print("File received")
-        img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
-        print("Image decoded")
-        img_resized = cv2.resize(img, (28, 28))
-        print("Image resized")
-        img_norm = img_resized.astype("float32") / 255.0
-        img_input = img_norm.reshape(1, 28, 28, 1)
+        img = image.load_img(BytesIO(file.read()), target_size=(28, 28), color_mode="grayscale")
+        print("Image loaded with keras")
+        img_array = image.img_to_array(img) / 255.0
+        img_input = np.expand_dims(img_array, axis=0)
         print("Image preprocessed")
 
         preds = cnn_model.predict(img_input)
